@@ -19,17 +19,15 @@ app.post('/api/deploy-bot', async (req, res) => {
     res.status(200).json({ message: "Bot initiated" });
 
     try {
-        console.log("🚀 Launching using System Chrome...");
+        console.log("🚀 Launching Auto-Configured Browser...");
 
+        // NO manual path needed! The .config.cjs file tells Puppeteer where to look.
         browser = await puppeteer.launch({
-            // THIS IS THE BYPASS: Pointing to the pre-installed Linux browser
-            executablePath: '/usr/bin/google-chrome', 
             headless: "new",
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', // Important for low-memory Free Tier
-                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
                 '--use-fake-ui-for-media-stream',
                 '--use-fake-device-for-media-stream',
             ]
@@ -41,13 +39,13 @@ app.post('/api/deploy-bot', async (req, res) => {
         console.log(`🔗 Navigating to: ${meetUrl}`);
         await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-        // Wait for name input
+        // Join Sequence
         try {
             const nameInput = 'input[type="text"]';
             await page.waitForSelector(nameInput, { timeout: 15000 });
             await page.type(nameInput, "Scribe AI Bot", { delay: 100 });
             await page.keyboard.press('Enter');
-        } catch (e) { console.log("⏩ Name skip or already passed"); }
+        } catch (e) { console.log("⏩ Skipping name screen..."); }
 
         await new Promise(r => setTimeout(r, 10000));
 
@@ -65,14 +63,12 @@ app.post('/api/deploy-bot', async (req, res) => {
             console.log("✅ Bot is knocking!");
             currentSummary = "Bot is knocking... Please Admit 'Scribe AI Bot'!";
         } else {
-            console.log("❌ Join button not found in current view.");
-            currentSummary = "Error: Bot reached the page but couldn't find the 'Join' button.";
+            currentSummary = "Error: Join button not found.";
         }
 
     } catch (error) {
         console.error("❌ Critical Bot Error:", error.message);
-        // If system chrome isn't at that path, let's try the other common Linux path
-        currentSummary = "Error: Bot failed to start. System browser not found.";
+        currentSummary = "Error: Bot failed to start. Configuration issue.";
     }
 });
 
@@ -81,12 +77,12 @@ app.get('/api/summary', (req, res) => res.json({ summary: currentSummary }));
 app.post('/api/stop-bot', async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent("Create a professional summary of the meeting.");
+        const result = await model.generateContent("Create a professional summary.");
         currentSummary = result.response.text();
         if (browser) await browser.close();
         res.json({ summary: currentSummary });
-    } catch (e) { res.status(500).json({ error: "AI Synthesis failed" }); }
+    } catch (e) { res.status(500).json({ error: "Summary failed" }); }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🤖 SCRIBE BACKEND LIVE ON PORT ${PORT}`));
+app.listen(PORT, () => console.log(`🤖 Backend Live on Port ${PORT}`));
