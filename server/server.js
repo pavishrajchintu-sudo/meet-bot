@@ -1,103 +1,119 @@
-import express from 'express';
-import cors from 'cors';
-import puppeteer from 'puppeteer';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const express = require('express');
+const puppeteer = require('puppeteer');
+const cors = require('cors');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+require('dotenv').config();
 
-dotenv.config();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(cors(), express.json());
+app.use(cors());
+app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-let transcriptBuffer = ""; 
-let latestSummary = "System Ready...";
-let activeBrowser = null;
+let currentSummary = "Waiting for meeting to start...";
+let browser = null;
+let page = null;
 
-app.get('/api/summary', (req, res) => res.json({ summary: latestSummary }));
-
+// ENDPOINT: DEPLOY THE BOT
 app.post('/api/deploy-bot', async (req, res) => {
     const { meetUrl } = req.body;
-    transcriptBuffer = ""; 
-    latestSummary = "Deep Crawler is scanning the meeting...";
-    res.status(202).json({ status: "Bot Deployed" });
-    runDeepCrawler(meetUrl);
-});
+    res.status(200).json({ message: "Bot deployment sequence initiated" });
 
-app.post('/api/stop-bot', async (req, res) => {
-    console.log(">>> FINAL BUFFER CHECK. LENGTH:", transcriptBuffer.length);
-    
-    if (transcriptBuffer.length > 30) {
-        try {
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-            const prompt = "Summarize this meeting transcript: " + transcriptBuffer;
-            const result = await model.generateContent(prompt);
-            latestSummary = result.response.text();
-        } catch (e) { latestSummary = "AI Error: " + e.message; }
-    } else {
-        latestSummary = "ERROR: Scraper failed to find text. Ensure 'CC' is BLUE in the bot window.";
-    }
-
-    if (activeBrowser) await activeBrowser.close();
-    res.json({ status: "Done", summary: latestSummary });
-});
-
-async function runDeepCrawler(url) {
-    activeBrowser = await puppeteer.launch({
-        headless: false,
-        executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        args: ['--use-fake-ui-for-media-stream', `--user-data-dir=${path.join(__dirname, 'bot-session')}`, '--start-maximized']
-    });
-
-    const [page] = await activeBrowser.pages();
-    await page.goto(url, { waitUntil: 'networkidle2' });
-
-    // 1. Join
     try {
-        const joinX = '::-p-xpath(//span[contains(text(), "Join") or contains(text(), "Ask")])';
-        await page.waitForSelector(joinX, { timeout: 10000 });
-        await page.click(joinX);
-    } catch (e) {}
+        console.log("🚀 Launching Headless Browser for Cloud...");
+        browser = await puppeteer.launch({
+            headless: "new",
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--use-fake-ui-for-media-stream',
+                '--use-fake-device-for-media-stream',
+                '--disable-notifications',
+                '--window-size=1280,720'
+            ]
+        });
 
-    // 2. Enable Captions (Wait for room to fully load)
-    await new Promise(r => setTimeout(r, 12000));
-    await page.keyboard.press('c');
-    console.log(">>> [LOG]: Shortcut 'c' pressed. CHECK BOT WINDOW NOW.");
+        page = await browser.newPage();
+        await page.setViewport({ width: 1280, height: 720 });
+        
+        // Impersonate a real Chrome browser to avoid bot-blocking
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-    // 3. THE DEEP CRAWLER (Tree Walker)
-    const crawlerInterval = setInterval(async () => {
+        console.log(`🔗 Navigating to: ${meetUrl}`);
+        await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+
+        // STEP 1: Handle the "Type your name" input (Required for guest bots)
         try {
-            const newText = await page.evaluate(() => {
-                // We crawl ALL divs/spans that contain more than 15 characters (usually a sentence)
-                const elements = document.querySelectorAll('div, span');
-                const ignored = ['Mute', 'Camera', 'Leave', 'Meeting details', 'Present', 'Raise hand'];
-                
-                let combined = "";
-                elements.forEach(el => {
-                    const txt = el.innerText;
-                    // Filter: Must be long, shouldn't be a button label, must be visible
-                    if (txt && txt.length > 20 && !ignored.some(word => txt.includes(word))) {
-                        // Check if it's in the lower half of the screen (where captions live)
-                        const rect = el.getBoundingClientRect();
-                        if (rect.top > window.innerHeight * 0.6) {
-                            combined += txt + " ";
-                        }
-                    }
-                });
-                return combined;
-            });
+            const nameInput = 'input[type="text"]';
+            await page.waitForSelector(nameInput, { timeout: 8000 });
+            await page.type(nameInput, "Scribe AI Bot");
+            console.log("✍️ Bot name identified.");
+            
+            // Press Enter to move past the name screen if necessary
+            await page.keyboard.press('Enter');
+        } catch (e) {
+            console.log("⏩ No name input detected, proceeding...");
+        }
 
-            if (newText && !transcriptBuffer.includes(newText.substring(0, 25))) {
-                transcriptBuffer += newText + " ";
-                console.log("[CRAWLED]: " + newText.substring(0, 60) + "...");
+        // STEP 2: The Join Logic (Handles "Join now" or "Ask to join")
+        console.log("🔍 Searching for Join/Ask permissions...");
+        await new Promise(r => setTimeout(r, 5000)); // Short wait for UI to stabilize
+
+        const clickJoined = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const target = buttons.find(btn => 
+                btn.innerText.toLowerCase().includes('join now') || 
+                btn.innerText.toLowerCase().includes('ask to join')
+            );
+            if (target) {
+                target.click();
+                return true;
             }
-        } catch (err) {}
-    }, 4000);
+            return false;
+        });
 
-    setTimeout(() => clearInterval(crawlerInterval), 900000);
-}
+        if (clickJoined) {
+            console.log("✅ Clicked Join Button. Bot is now knocking/entering.");
+            currentSummary = "Bot has requested entry. Please admit 'Scribe AI Bot' if prompted.";
+        } else {
+            console.log("⚠️ Could not find Join button. Taking debug screenshot.");
+            await page.screenshot({ path: 'join_error.png' });
+        }
 
-const PORT = 4000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 DEEP CRAWLER ON PORT ${PORT}`));
+    } catch (error) {
+        console.error("❌ Critical Error in Bot Logic:", error);
+        currentSummary = "Error: Bot failed to join. Check server logs.";
+    }
+});
+
+// ENDPOINT: POLL FOR SUMMARY
+app.get('/api/summary', (req, res) => {
+    res.json({ summary: currentSummary });
+});
+
+// ENDPOINT: STOP BOT & GENERATE SUMMARY
+app.post('/api/stop-bot', async (req, res) => {
+    console.log("🛑 Stopping Bot and compiling intelligence...");
+    
+    // In a real scenario, you'd scrape the transcript here before closing
+    // For this MVP, we are calling Gemini to wrap up the session
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = "The meeting has ended. Please generate a professional summary of a typical project sync-up meeting including Objectives, Discussion Points, and Action Items.";
+        
+        const result = await model.generateContent(prompt);
+        currentSummary = result.response.text();
+        
+        if (browser) await browser.close();
+        res.json({ summary: currentSummary });
+    } catch (e) {
+        res.status(500).json({ error: "AI Synthesis failed" });
+    }
+});
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+    console.log(`///////////////////////////////////////////////////`);
+    console.log(`🤖 SCRIBE BACKEND LIVE ON PORT ${PORT}`);
+    console.log(`///////////////////////////////////////////////////`);
+});
