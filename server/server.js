@@ -3,6 +3,7 @@ import puppeteer from 'puppeteer';
 import cors from 'cors';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
@@ -13,15 +14,19 @@ app.use(express.json());
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 let currentSummary = "Awaiting deployment...";
 let browser = null;
-let page = null;
 
 app.post('/api/deploy-bot', async (req, res) => {
     const { meetUrl } = req.body;
-    res.status(200).json({ message: "Bot deployment sequence initiated" });
+    res.status(200).json({ message: "Bot initiated" });
 
     try {
-        console.log("🚀 Launching Headless Browser...");
+        console.log("🚀 Launching Headless Browser with Fixed Path...");
+        
+        // This is the secret sauce for Render's Puppeteer cache
+        const chromePath = '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome';
+
         browser = await puppeteer.launch({
+            executablePath: chromePath, // MANUALLY POINTING TO CHROME
             headless: "new",
             args: [
                 '--no-sandbox',
@@ -29,82 +34,59 @@ app.post('/api/deploy-bot', async (req, res) => {
                 '--disable-blink-features=AutomationControlled',
                 '--use-fake-ui-for-media-stream',
                 '--use-fake-device-for-media-stream',
-                '--disable-notifications',
-                '--window-size=1280,720'
+                '--lang=en-US'
             ]
         });
 
-        page = await browser.newPage();
-        await page.setViewport({ width: 1280, height: 720 });
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
 
         console.log(`🔗 Navigating to: ${meetUrl}`);
-        // Increase timeout for cloud navigation
-        await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
+        await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-        // STEP 1: Handle Name Input (Wait longer for cloud delay)
+        // WAIT and JOIN logic
+        await new Promise(r => setTimeout(r, 8000));
+        
         try {
             const nameInput = 'input[type="text"]';
-            await page.waitForSelector(nameInput, { timeout: 15000 });
+            await page.waitForSelector(nameInput, { timeout: 10000 });
             await page.type(nameInput, "Scribe AI Bot", { delay: 100 });
             await page.keyboard.press('Enter');
-            console.log("✍️ Bot name entered.");
-        } catch (e) {
-            console.log("⏩ No name input box found, skipping...");
-        }
+        } catch (e) { console.log("⏩ Name skip"); }
 
-        // STEP 2: The Brute-Force Smart Joiner
-        await new Promise(r => setTimeout(r, 10000)); // Give UI 10 seconds to load buttons
+        await new Promise(r => setTimeout(r, 10000));
 
         const joinSuccess = await page.evaluate(() => {
-            const buttons = Array.from(document.querySelectorAll('button'));
-            // Look for any button that resembles joining
-            const joinBtn = buttons.find(btn => {
-                const text = btn.innerText.toLowerCase();
-                return text.includes('join now') || 
-                       text.includes('ask to join') || 
-                       text.includes('join') ||
-                       btn.getAttribute('aria-label')?.toLowerCase().includes('join');
-            });
-            
-            if (joinBtn) {
-                joinBtn.click();
-                return true;
-            }
+            const btns = Array.from(document.querySelectorAll('button'));
+            const target = btns.find(b => b.innerText.toLowerCase().includes('join') || b.innerText.toLowerCase().includes('ask'));
+            if (target) { target.click(); return true; }
             return false;
         });
 
         if (joinSuccess) {
-            console.log("✅ Clicked Join/Ask button.");
-            currentSummary = "Bot knocking... Please click 'Admit' in your Google Meet now!";
+            console.log("✅ Bot is knocking!");
+            currentSummary = "Bot is knocking... Click 'Admit' in your Meet!";
         } else {
-            console.log("❌ Could not find any join button.");
-            currentSummary = "Error: Bot couldn't find the 'Join' button. Is the link valid?";
+            console.log("❌ Button not found.");
+            currentSummary = "Error: Bot reached the page but couldn't find the join button.";
         }
 
     } catch (error) {
-        console.error("❌ Critical Bot Error:", error);
+        console.error("❌ Critical Bot Error:", error.message);
         currentSummary = "Error: Bot failed to join.";
     }
 });
 
-app.get('/api/summary', (req, res) => {
-    res.json({ summary: currentSummary });
-});
+app.get('/api/summary', (req, res) => res.json({ summary: currentSummary }));
 
 app.post('/api/stop-bot', async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent("Create a professional summary of the meeting.");
+        const result = await model.generateContent("Create a professional summary.");
         currentSummary = result.response.text();
         if (browser) await browser.close();
         res.json({ summary: currentSummary });
-    } catch (e) {
-        res.status(500).json({ error: "AI Synthesis failed" });
-    }
+    } catch (e) { res.status(500).json({ error: "Fail" }); }
 });
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-    console.log(`🤖 SCRIBE BACKEND LIVE ON PORT ${PORT}`);
-});
+app.listen(process.env.PORT || 4000);
