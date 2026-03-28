@@ -33,7 +33,7 @@ function App() {
   const stopBot = async () => {
     setIsRunning(false);
     // WIRED TO RENDER BACKEND
-    const res = await fetch('https://meet-bot-8crl.onrender.com/api/stop-bot', { method: 'POST' });
+    const res = await fetch('https://meet-bot-docker.onrender.com', { method: 'POST' });
     const data = await res.json();
     setSummary(data.summary);
   };
