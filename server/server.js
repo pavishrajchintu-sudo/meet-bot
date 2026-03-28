@@ -14,25 +14,23 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 let currentSummary = "Awaiting deployment...";
 let browser = null;
 
-app.get('/', (req, res) => res.send("🤖 Scribe AI Docker Node is Syncing!"));
+app.get('/', (req, res) => res.send("🤖 Scribe AI Docker Node is Fully Configured!"));
 
 app.post('/api/deploy-bot', async (req, res) => {
     const { meetUrl } = req.body;
     res.status(200).json({ message: "Bot initiated" });
 
     try {
-        // AUTOMATED DISCOVERY: This finds the Chrome-for-Testing path automatically
-        const autoPath = puppeteer.executablePath();
-        console.log(`🚀 System Discovery found Chrome at: ${autoPath}`);
+        console.log("🚀 Launching Chrome via Auto-Discovery...");
 
         browser = await puppeteer.launch({
-            executablePath: autoPath,
+            // Let puppeteer find the binary we just force-installed in the Dockerfile
+            executablePath: puppeteer.executablePath(),
             headless: "new",
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-gpu',
                 '--use-fake-ui-for-media-stream',
                 '--use-fake-device-for-media-stream',
             ]
@@ -44,13 +42,13 @@ app.post('/api/deploy-bot', async (req, res) => {
         console.log(`🔗 Navigating to: ${meetUrl}`);
         await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-        // Join Sequence
+        // Join Logic
         try {
             const nameInput = 'input[type="text"]';
             await page.waitForSelector(nameInput, { timeout: 15000 });
-            await page.type(nameInput, "Scribe AI Bot", { delay: 100 });
+            await page.type(nameInput, "Scribe AI Bot");
             await page.keyboard.press('Enter');
-        } catch (e) { console.log("⏩ Join button screen direct entry"); }
+        } catch (e) { console.log("⏩ Proceeding to join..."); }
 
         await new Promise(r => setTimeout(r, 10000));
 
@@ -67,7 +65,7 @@ app.post('/api/deploy-bot', async (req, res) => {
         currentSummary = joinSuccess ? "Bot is knocking! Admit 'Scribe AI Bot' now." : "Error: Join button not found.";
 
     } catch (error) {
-        console.error("❌ DOCKER EXECUTION ERROR:", error.message);
+        console.error("❌ DOCKER ERROR:", error.message);
         currentSummary = `Error: ${error.message}`;
     }
 });
@@ -77,7 +75,7 @@ app.get('/api/summary', (req, res) => res.json({ summary: currentSummary }));
 app.post('/api/stop-bot', async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent("Summarize the meeting.");
+        const result = await model.generateContent("Summarize the meeting highlights.");
         currentSummary = result.response.text();
         if (browser) await browser.close();
         res.json({ summary: currentSummary });
@@ -85,4 +83,4 @@ app.post('/api/stop-bot', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🤖 Live on 0.0.0.0:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🤖 Backend Live on 0.0.0.0:${PORT}`));

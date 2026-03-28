@@ -1,8 +1,6 @@
 FROM ghcr.io/puppeteer/puppeteer:latest
 
-# Switch to root to configure the environment
 USER root
-
 WORKDIR /app
 
 # Copy package files
@@ -11,13 +9,15 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy the rest of the code
+# FORCE CHROME INSTALLATION into the pptruser cache directory
+RUN npx puppeteer browsers install chrome
+
+# Copy source code
 COPY . .
 
-# CRITICAL: Grant permission to the Puppeteer cache where Chrome lives
-RUN chown -R pptruser:pptruser /app && chmod -R 777 /home/pptruser/.cache/puppeteer
+# Ensure pptruser owns everything
+RUN chown -R pptruser:pptruser /app /home/pptruser/.cache/puppeteer
 
-# Switch back to the specialized user
 USER pptruser
 
 EXPOSE 10000
