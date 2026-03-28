@@ -1,7 +1,6 @@
-# Use the official Puppeteer image
 FROM ghcr.io/puppeteer/puppeteer:latest
 
-# Switch to root to fix permission issues during install
+# Switch to root to configure the environment
 USER root
 
 WORKDIR /app
@@ -9,19 +8,18 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies as root to avoid EACCES errors
+# Install dependencies
 RUN npm install
 
 # Copy the rest of the code
 COPY . .
 
-# Change ownership of the app folder to pptruser
-RUN chown -R pptruser:pptruser /app
+# CRITICAL: Grant permission to the Puppeteer cache where Chrome lives
+RUN chown -R pptruser:pptruser /app && chmod -R 777 /home/pptruser/.cache/puppeteer
 
-# Switch back to the non-privileged user for security
+# Switch back to the specialized user
 USER pptruser
 
-# Render's default port
 EXPOSE 10000
 
 CMD ["node", "server.js"]
