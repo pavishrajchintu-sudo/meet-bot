@@ -1,0 +1,12 @@
+# Node modules in any directory
+node_modules/
+
+# Environment variables
+.env
+
+# Puppeteer Chrome Profile Cache (Massive file size)
+server/bot-session/
+bot-session/
+
+# System files
+.DS_Store
