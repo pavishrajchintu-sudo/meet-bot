@@ -22,10 +22,10 @@ app.post('/api/deploy-bot', async (req, res) => {
     res.status(200).json({ message: "Bot initiated" });
 
     try {
-        // Points to the local folder we created in the build command
+        // Updated to the absolute path structure Render uses
         const executablePath = path.join(__dirname, 'chrome-bin', 'chrome', 'linux-127.0.6533.88', 'chrome-linux64', 'chrome');
         
-        console.log(`🚀 Launching from local project path: ${executablePath}`);
+        console.log(`🚀 Launching from Absolute Path: ${executablePath}`);
 
         browser = await puppeteer.launch({
             executablePath: executablePath,
@@ -45,7 +45,7 @@ app.post('/api/deploy-bot', async (req, res) => {
         console.log(`🔗 Navigating to: ${meetUrl}`);
         await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-        // Join Sequence
+        // Join Logic
         try {
             const nameInput = 'input[type="text"]';
             await page.waitForSelector(nameInput, { timeout: 15000 });
@@ -71,7 +71,7 @@ app.post('/api/deploy-bot', async (req, res) => {
 
     } catch (error) {
         console.error("❌ Critical Bot Error:", error.message);
-        currentSummary = "Error: Bot failed to start. Path check failed.";
+        currentSummary = "Error: Bot failed to start. Path issue.";
     }
 });
 
