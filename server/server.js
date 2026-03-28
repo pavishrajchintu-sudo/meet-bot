@@ -19,10 +19,11 @@ app.post('/api/deploy-bot', async (req, res) => {
     res.status(200).json({ message: "Bot initiated" });
 
     try {
-        console.log("🚀 Launching Auto-Configured Browser...");
+        console.log("🚀 Launching with Official Executable Discovery...");
 
-        // NO manual path needed! The .config.cjs file tells Puppeteer where to look.
         browser = await puppeteer.launch({
+            // This tells Puppeteer to find the Chrome we installed in Step 1
+            executablePath: puppeteer.executablePath(),
             headless: "new",
             args: [
                 '--no-sandbox',
@@ -39,36 +40,33 @@ app.post('/api/deploy-bot', async (req, res) => {
         console.log(`🔗 Navigating to: ${meetUrl}`);
         await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-        // Join Sequence
+        // Wait and Join
         try {
             const nameInput = 'input[type="text"]';
             await page.waitForSelector(nameInput, { timeout: 15000 });
-            await page.type(nameInput, "Scribe AI Bot", { delay: 100 });
+            await page.type(nameInput, "Scribe AI Bot");
             await page.keyboard.press('Enter');
-        } catch (e) { console.log("⏩ Skipping name screen..."); }
+        } catch (e) { console.log("⏩ Join screen..."); }
 
         await new Promise(r => setTimeout(r, 10000));
 
         const joinSuccess = await page.evaluate(() => {
             const btns = Array.from(document.querySelectorAll('button'));
-            const target = btns.find(b => {
-                const text = b.innerText.toLowerCase();
-                return text.includes('join now') || text.includes('ask to join') || text.includes('join');
-            });
+            const target = btns.find(b => b.innerText.toLowerCase().includes('join') || b.innerText.toLowerCase().includes('ask'));
             if (target) { target.click(); return true; }
             return false;
         });
 
         if (joinSuccess) {
             console.log("✅ Bot is knocking!");
-            currentSummary = "Bot is knocking... Please Admit 'Scribe AI Bot'!";
+            currentSummary = "Bot is knocking... Admit 'Scribe AI Bot'!";
         } else {
             currentSummary = "Error: Join button not found.";
         }
 
     } catch (error) {
         console.error("❌ Critical Bot Error:", error.message);
-        currentSummary = "Error: Bot failed to start. Configuration issue.";
+        currentSummary = "Error: Bot failed to start.";
     }
 });
 
@@ -77,11 +75,11 @@ app.get('/api/summary', (req, res) => res.json({ summary: currentSummary }));
 app.post('/api/stop-bot', async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent("Create a professional summary.");
+        const result = await model.generateContent("Summarize the meeting.");
         currentSummary = result.response.text();
         if (browser) await browser.close();
         res.json({ summary: currentSummary });
-    } catch (e) { res.status(500).json({ error: "Summary failed" }); }
+    } catch (e) { res.status(500).json({ error: "Fail" }); }
 });
 
 const PORT = process.env.PORT || 10000;
