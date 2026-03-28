@@ -11,17 +11,16 @@ app.use(cors());
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-let currentSummary = "Waiting for meeting to start...";
+let currentSummary = "Awaiting deployment...";
 let browser = null;
 let page = null;
 
-// ENDPOINT: DEPLOY THE BOT
 app.post('/api/deploy-bot', async (req, res) => {
     const { meetUrl } = req.body;
     res.status(200).json({ message: "Bot deployment sequence initiated" });
 
     try {
-        console.log("🚀 Launching Headless Browser for Cloud...");
+        console.log("🚀 Launching Headless Browser...");
         browser = await puppeteer.launch({
             headless: "new",
             args: [
@@ -37,47 +36,54 @@ app.post('/api/deploy-bot', async (req, res) => {
 
         page = await browser.newPage();
         await page.setViewport({ width: 1280, height: 720 });
-        
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         console.log(`🔗 Navigating to: ${meetUrl}`);
-        await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+        // Increase timeout for cloud navigation
+        await page.goto(meetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-        // STEP 1: Handle Name Input
+        // STEP 1: Handle Name Input (Wait longer for cloud delay)
         try {
             const nameInput = 'input[type="text"]';
-            await page.waitForSelector(nameInput, { timeout: 8000 });
-            await page.type(nameInput, "Scribe AI Bot");
+            await page.waitForSelector(nameInput, { timeout: 15000 });
+            await page.type(nameInput, "Scribe AI Bot", { delay: 100 });
             await page.keyboard.press('Enter');
+            console.log("✍️ Bot name entered.");
         } catch (e) {
-            console.log("⏩ No name input detected, proceeding...");
+            console.log("⏩ No name input box found, skipping...");
         }
 
-        // STEP 2: Join Logic
-        await new Promise(r => setTimeout(r, 5000)); 
+        // STEP 2: The Brute-Force Smart Joiner
+        await new Promise(r => setTimeout(r, 10000)); // Give UI 10 seconds to load buttons
 
-        const clickJoined = await page.evaluate(() => {
+        const joinSuccess = await page.evaluate(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
-            const target = buttons.find(btn => 
-                btn.innerText.toLowerCase().includes('join now') || 
-                btn.innerText.toLowerCase().includes('ask to join')
-            );
-            if (target) {
-                target.click();
+            // Look for any button that resembles joining
+            const joinBtn = buttons.find(btn => {
+                const text = btn.innerText.toLowerCase();
+                return text.includes('join now') || 
+                       text.includes('ask to join') || 
+                       text.includes('join') ||
+                       btn.getAttribute('aria-label')?.toLowerCase().includes('join');
+            });
+            
+            if (joinBtn) {
+                joinBtn.click();
                 return true;
             }
             return false;
         });
 
-        if (clickJoined) {
-            console.log("✅ Clicked Join Button.");
-            currentSummary = "Bot knocking. Admit 'Scribe AI Bot' now!";
+        if (joinSuccess) {
+            console.log("✅ Clicked Join/Ask button.");
+            currentSummary = "Bot knocking... Please click 'Admit' in your Google Meet now!";
         } else {
-            console.log("⚠️ Join button not found.");
+            console.log("❌ Could not find any join button.");
+            currentSummary = "Error: Bot couldn't find the 'Join' button. Is the link valid?";
         }
 
     } catch (error) {
-        console.error("❌ Bot Error:", error);
+        console.error("❌ Critical Bot Error:", error);
         currentSummary = "Error: Bot failed to join.";
     }
 });
@@ -89,7 +95,7 @@ app.get('/api/summary', (req, res) => {
 app.post('/api/stop-bot', async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent("Summarize the project sync-up.");
+        const result = await model.generateContent("Create a professional summary of the meeting.");
         currentSummary = result.response.text();
         if (browser) await browser.close();
         res.json({ summary: currentSummary });
