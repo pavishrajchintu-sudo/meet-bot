@@ -22,7 +22,8 @@ function App() {
 
   const startBot = async () => {
     setIsRunning(true);
-    await fetch('http://localhost:4000/api/deploy-bot', {
+    // WIRED TO RENDER BACKEND
+    await fetch('https://meet-bot-8crl.onrender.com/api/deploy-bot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meetUrl: url }),
@@ -31,7 +32,8 @@ function App() {
 
   const stopBot = async () => {
     setIsRunning(false);
-    const res = await fetch('http://localhost:4000/api/stop-bot', { method: 'POST' });
+    // WIRED TO RENDER BACKEND
+    const res = await fetch('https://meet-bot-8crl.onrender.com/api/stop-bot', { method: 'POST' });
     const data = await res.json();
     setSummary(data.summary);
   };
@@ -64,7 +66,8 @@ function App() {
   useEffect(() => {
     const poll = setInterval(async () => {
       try {
-        const res = await fetch('http://localhost:4000/api/summary');
+        // WIRED TO RENDER BACKEND
+        const res = await fetch('https://meet-bot-8crl.onrender.com/api/summary');
         const data = await res.json();
         if (data.summary !== summary) setSummary(data.summary);
       } catch (e) {}
@@ -188,7 +191,7 @@ function App() {
 
       </div>
 
-      {/* Custom Scrollbar CSS hidden in a style tag for easy drop-in */}
+      {/* Custom Scrollbar CSS */}
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
