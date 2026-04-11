@@ -14,7 +14,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const pollRef = useRef(null);
 
-  const AWS_URL = "https://ofunwseaxkbz3koxygqfg3ve6y0skfxi.lambda-url.ap-south-1.on.aws/";
+  const AWS_URL = "http://localhost:3001/";
 
   useEffect(() => {
     const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
@@ -86,26 +86,93 @@ function App() {
     }
   };
 
+  // ── THE NEW ASYNC ORCHESTRATOR ─────────────────────────────────────────
   const stopBot = async () => {
     if (pollRef.current) clearInterval(pollRef.current);
-    setSummary("🧠 **Generating AI summary...**\n\nPlease wait 15-30 seconds...");
-
+    
     try {
-      const response = await fetch(AWS_URL, {
+      // Step 1: Tell Bot to Leave
+      setSummary("🛑 **Stopping bot...**\n\nInstructing Scribe AI to leave the meeting.");
+      await fetch(AWS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'stop', botId: botId }),
       });
-      const data = await response.json();
-      setSummary(data.summary || "❌ No summary returned.");
+
+      // Step 2: Poll for Audio URL
+      setSummary("⏳ **Processing Meeting Audio...**\n\nWaiting for Recall.ai to finalize the recording.");
+      let audioUrl = null;
+      for (let i = 0; i < 20; i++) { // Try for ~100 seconds
+        const res = await fetch(AWS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_audio', botId: botId }),
+        });
+        const data = await res.json();
+        if (data.status === 'ready' && data.audioUrl) {
+          audioUrl = data.audioUrl;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 5000)); // Wait 5s before asking again
+      }
+
+      if (!audioUrl) throw new Error("Audio processing timed out.");
+
+      // Step 3: Start AssemblyAI Transcription
+      setSummary("🎙️ **Starting Transcription...**\n\nSending high-fidelity audio to AssemblyAI.");
+      const transRes = await fetch(AWS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start_transcription', audioUrl }),
+      });
+      const transData = await transRes.json();
+      const transcriptId = transData.transcriptId;
+
+      if (!transcriptId) throw new Error("Failed to start AssemblyAI transcription.");
+
+      // Step 4: Poll AssemblyAI for Text
+      setSummary("📝 **Transcribing Meeting...**\n\nThis usually takes 30-60 seconds depending on meeting length.");
+      let transcriptText = null;
+      for (let i = 0; i < 30; i++) { // Try for ~150 seconds
+        const checkRes = await fetch(AWS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'check_transcription', transcriptId }),
+        });
+        const checkData = await checkRes.json();
+        
+        if (checkData.status === 'completed' && checkData.transcript) {
+          transcriptText = checkData.transcript;
+          break;
+        } else if (checkData.status === 'error') {
+          throw new Error("AssemblyAI encountered an error while transcribing.");
+        }
+        await new Promise(r => setTimeout(r, 5000));
+      }
+
+      if (!transcriptText) throw new Error("Transcription timed out.");
+
+      // Step 5: Summarize with Groq/LLM
+      setSummary("🧠 **Generating Intelligence Report...**\n\nPassing extracted transcript to LLM engine.");
+      const sumRes = await fetch(AWS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'summarize', transcript: transcriptText }),
+      });
+      const sumData = await sumRes.json();
+
+      setSummary(sumData.summary || "❌ Summary generation failed.");
+
     } catch (error) {
-      setSummary("❌ Error generating summary.");
+      setSummary(`❌ **Error:** ${error.message}`);
     }
 
+    // Cleanup and Reset UI
     setIsRunning(false);
     setBotId(null);
     setBotStatus('idle');
   };
+  // ───────────────────────────────────────────────────────────────────────
 
   const downloadPDF = () => {
     const doc = new jsPDF();
@@ -116,7 +183,7 @@ function App() {
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
     doc.text(`Generated on ${new Date().toLocaleString()}`, 20, 28);
-    let cleanText = summary.replace(/\*\*/g, '').replace(/#/g, '').replace(/[🧠✅📋🔜💬🟢🟡❌🚀📞]/g, '');
+    let cleanText = summary.replace(/\*\*/g, '').replace(/#/g, '').replace(/[🧠✅📋🔜💬🟢🟡❌🚀📞⏳🎙️📝]/g, '');
     doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     const lines = doc.splitTextToSize(cleanText, 170);
@@ -135,8 +202,8 @@ function App() {
       joining:   { color: 'text-yellow-400', bg: 'bg-yellow-400/10', dot: 'bg-yellow-400 animate-ping', label: 'Joining...' },
       waiting:   { color: 'text-yellow-400', bg: 'bg-yellow-400/10', dot: 'bg-yellow-400 animate-ping', label: 'Waiting Room' },
       in_call:   { color: 'text-green-400',  bg: 'bg-green-400/10',  dot: 'bg-green-400 animate-pulse', label: 'Live in Meeting' },
-      done:      { color: 'text-blue-400',   bg: 'bg-blue-400/10',   dot: 'bg-blue-400',               label: 'Meeting Ended' },
-      call_ended:{ color: 'text-blue-400',   bg: 'bg-blue-400/10',   dot: 'bg-blue-400',               label: 'Meeting Ended' },
+      done:      { color: 'text-blue-400',   bg: 'bg-blue-400/10',   dot: 'bg-blue-400',              label: 'Meeting Ended' },
+      call_ended:{ color: 'text-blue-400',   bg: 'bg-blue-400/10',   dot: 'bg-blue-400',              label: 'Meeting Ended' },
     };
     const c = configs[botStatus] || configs.idle;
     return (
@@ -203,13 +270,13 @@ function App() {
             <div className="flex-1">
               <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">Core Engine</label>
               <div className="w-full bg-white/5 py-2 px-4 rounded-lg text-sm text-cyan-400 font-mono border border-cyan-500/30 flex items-center gap-2">
-                <Zap className="w-4 h-4" /> Gemini 1.5 Flash
+                <Zap className="w-4 h-4" /> Groq Llama-3
               </div>
             </div>
             <div className="flex-1">
               <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">Bot Provider</label>
               <div className="w-full bg-white/5 py-2 px-4 rounded-lg text-sm text-purple-400 font-mono border border-purple-500/30 flex items-center gap-2">
-                <Radio className="w-4 h-4" /> Recall.ai
+                <Radio className="w-4 h-4" /> Recall.ai + AssemblyAI
               </div>
             </div>
           </div>
@@ -280,7 +347,7 @@ function App() {
               <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
               Intelligence Buffer
             </h2>
-            {hasSummary && !summary.includes("Deploying") && !summary.includes("Generating") && (
+            {hasSummary && !summary.includes("Deploying") && !summary.includes("Generating") && !summary.includes("Processing") && !summary.includes("Transcribing") && !summary.includes("Stopping") && !summary.includes("Starting") && (
               <button onClick={downloadPDF}
                 className="group flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:border-purple-500/50">
                 <Download className="w-4 h-4 text-purple-400 group-hover:-translate-y-1 transition-transform" />
