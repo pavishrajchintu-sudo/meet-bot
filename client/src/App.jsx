@@ -14,7 +14,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const pollRef = useRef(null);
 
-  const AWS_URL = "http://localhost:3001/";
+  const AWS_URL = "https://ofunwseaxkbz3koxygqfg3ve6y0skfxi.lambda-url.ap-south-1.on.aws/";
 
   useEffect(() => {
     const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
