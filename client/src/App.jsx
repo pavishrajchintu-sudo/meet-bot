@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 
 function App() {
-  // ── STATE & LOGIC (PRESERVED) ──────────────────────────────────────────
+  // ── STATE & LOGIC (STRICTLY PRESERVED) ──────────────────────────────────
   const [url, setUrl] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [summary, setSummary] = useState('System ready // Awaiting deployment...');
+  const [summary, setSummary] = useState('System ready // Awaiting neural deployment...');
   const [botId, setBotId] = useState(null);
   const [botStatus, setBotStatus] = useState('idle');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -39,7 +39,7 @@ function App() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // ── CORE FUNCTIONS (PRESERVED) ──────────────────────────────────────────
+  // ── CORE BACKEND FUNCTIONS (UNCHANGED) ─────────────────────────────────
   const startPolling = (id) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
@@ -52,7 +52,7 @@ function App() {
         const data = await res.json();
         const s = data.status || 'unknown';
         setBotStatus(s);
-        if (s === 'in_call') setSummary("UPLINK ACTIVE // LISTENING AND TRANSCRIBING stream");
+        if (s === 'in_call') setSummary("🟢 **UPLINK ACTIVE** // Listening to audio stream...");
       } catch (e) { console.log(e.message); }
     }, 5000);
   };
@@ -61,7 +61,7 @@ function App() {
     if (!url.includes('meet.google.com')) return alert("Invalid Meet URL");
     setIsRunning(true);
     setBotStatus('joining');
-    setSummary("DEPLOYING SCRIBE_OS INTELLIGENCE NODE...");
+    setSummary("🚀 **DEPLOYING SCRIBE_OS NODE...**");
     setActiveTab('terminal');
     try {
       const response = await fetch(AWS_URL, {
@@ -80,9 +80,9 @@ function App() {
   const stopBot = async () => {
     if (pollRef.current) clearInterval(pollRef.current);
     try {
-      setSummary("TERMINATING SESSION... // INITIATING DATA EXTRACTION");
+      setSummary("🛑 **TERMINATING SESSION...** // Initiating extraction protocol");
       await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'stop', botId: botId }) });
-      setSummary("SYNCING MEDIA PACKAGE... // FETCHING Recall.ai recording link");
+      setSummary("⏳ **SYNCING MEDIA PACKAGE...** // Polling server storage");
       let audioUrl = null;
       for (let i = 0; i < 20; i++) {
         const res = await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'get_audio', botId: botId }) });
@@ -90,7 +90,7 @@ function App() {
         if (data.status === 'ready') { audioUrl = data.audioUrl; break; }
         await new Promise(r => setTimeout(r, 5000));
       }
-      setSummary("NEURAL STT PIPELINE... // ROUTING HIGH-FIDELITY AUDIO TO AssemblyAI");
+      setSummary("🎙️ **NEURAL STT PIPELINE...** // Transcribing high-fidelity audio");
       const transRes = await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'start_transcription', audioUrl }) });
       const { transcriptId } = await transRes.json();
       let transcriptText = null;
@@ -100,12 +100,12 @@ function App() {
         if (d.status === 'completed') { transcriptText = d.transcript; break; }
         await new Promise(r => setTimeout(r, 5000));
       }
-      setSummary("GENERATING LLM REPORT... // SYNTESIZING Groq Llama-3 INTELLIGENCE");
+      setSummary("🧠 **GENERATING LLM REPORT...** // Synthesizing intelligence payload");
       const sumRes = await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'summarize', transcript: transcriptText }) });
       const sumData = await sumRes.json();
       setSummary(sumData.summary);
       setHistory(prev => [{ id: Date.now(), text: sumData.summary, date: new Date().toLocaleString() }, ...prev]);
-    } catch (e) { setSummary(`❌ FAILURE: ${e.message}`); }
+    } catch (e) { setSummary(`❌ **CRITICAL FAILURE:** ${e.message}`); }
     setIsRunning(false); setBotId(null); setBotStatus('idle');
   };
 
@@ -117,30 +117,29 @@ function App() {
     doc.save(`Report_${Date.now()}.pdf`);
   };
 
-  // ── LINEAR Standard VisCom Components ─────────────────────────────────
+  // ── 3D NEON GLASS UI COMPONENTS ───────────────────────────────────────
 
   const StatusBadge = () => {
     const configs = {
-      idle:      { text: 'text-zinc-500', bg: 'bg-zinc-100', border: 'border-zinc-200/50', label: 'STANDBY' },
-      joining:   { text: 'text-zinc-800', bg: 'bg-zinc-200', border: 'border-zinc-300/50', label: 'CONNECTING...' },
-      waiting:   { text: 'text-zinc-800', bg: 'bg-zinc-200', border: 'border-zinc-300/50', label: 'AWAITING ENTRY' },
-      in_call:   { text: 'text-blue-600', bg: 'bg-blue-50',  border: 'border-blue-200/50', label: 'UPLINK ACTIVE' },
-      done:      { text: 'text-zinc-900', bg: 'bg-zinc-300', border: 'border-zinc-400/50', label: 'MEETING CONCLUDED' },
+      idle:      { text: 'text-blue-200', bg: 'bg-white/5', border: 'border-white/10', glow: '', label: 'STANDBY' },
+      joining:   { text: 'text-cyan-300', bg: 'bg-cyan-500/20', border: 'border-cyan-400/50', glow: 'shadow-[0_0_15px_rgba(34,211,238,0.4)]', label: 'CONNECTING...' },
+      waiting:   { text: 'text-fuchsia-300', bg: 'bg-fuchsia-500/20', border: 'border-fuchsia-400/50', glow: 'shadow-[0_0_15px_rgba(217,70,239,0.4)]', label: 'AWAITING ENTRY' },
+      in_call:   { text: 'text-blue-300', bg: 'bg-blue-500/20', border: 'border-blue-400/50', glow: 'shadow-[0_0_15px_rgba(59,130,246,0.4)]', label: 'UPLINK ACTIVE' },
+      done:      { text: 'text-purple-300', bg: 'bg-purple-500/20', border: 'border-purple-400/50', glow: 'shadow-[0_0_15px_rgba(168,85,247,0.4)]', label: 'MEETING CONCLUDED' },
     };
     const c = configs[botStatus] || configs.idle;
     return (
-      <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${c.bg} border ${c.border} shadow-sm transition-all`}>
-        <div className={`w-1.5 h-1.5 rounded-full ${c.text.replace('text-', 'bg-')} ${botStatus !== 'idle' ? 'animate-pulse' : ''}`} />
+      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${c.bg} border ${c.border} ${c.glow} backdrop-blur-md transition-all duration-300`}>
+        <div className={`w-1.5 h-1.5 rounded-full ${c.text.replace('text-', 'bg-')} ${botStatus !== 'idle' ? 'animate-pulse shadow-[0_0_8px_currentColor]' : ''}`} />
         <span className={`text-[10px] tracking-widest font-bold font-mono ${c.text}`}>{c.label}</span>
       </div>
     );
   };
 
-  // Upgraded dynamic stepper with matte, monochromatic lines and blue accent focus
   const PipelineStepper = () => {
     const steps = [
       { key: "Stopping", label: "Extract" },
-      { key: "FETCHING", label: "Media" },
+      { key: "SYNCING", label: "Media" },
       { key: "NEURAL",   label: "Transcribe" },
       { key: "GENERATING", label: "Synthesis" }
     ];
@@ -149,14 +148,22 @@ function App() {
     if (activeIndex === -1 && !summary.includes("Finalizing")) return null;
 
     return (
-      <div className="flex gap-1 w-full mb-8">
+      <div className="flex gap-1 w-full mb-8 bg-black/20 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-inner">
         {steps.map((step, idx) => {
           const isActive = idx === activeIndex || (idx === 3 && summary.includes("Finalizing"));
           const isPast = idx < activeIndex;
           return (
-            <div key={step.key} className="flex-1 flex flex-col gap-2">
-              <div className={`h-1.5 rounded-sm transition-all duration-500 ${isPast ? 'bg-zinc-900' : isActive ? 'bg-blue-600 animate-pulse' : 'bg-zinc-200'}`} />
-              <span className={`text-[9px] uppercase tracking-[0.2em] font-mono font-bold ${isActive ? 'text-zinc-900' : isPast ? 'text-zinc-700' : 'text-zinc-400'}`}>
+            <div key={step.key} className="flex-1 flex flex-col items-center gap-2 relative z-10">
+              {idx !== steps.length - 1 && (
+                <div className={`absolute top-3.5 left-1/2 w-full h-px ${isPast ? 'bg-cyan-400 shadow-[0_0_5px_#22d3ee]' : 'bg-white/10'} transition-all duration-500`} />
+              )}
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 z-10 ${
+                isActive ? 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_15px_rgba(34,211,238,0.6)] text-white scale-110' : 
+                isPast ? 'bg-white/10 border border-cyan-500/50 text-cyan-400' : 'bg-white/5 border border-white/10 text-white/30'
+              }`}>
+                {isPast ? <CheckCircle2 className="w-3.5 h-3.5" /> : isActive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <div className="w-1.5 h-1.5 rounded-full bg-white/20" />}
+              </div>
+              <span className={`text-[9px] uppercase tracking-widest font-mono font-bold ${isActive ? 'text-cyan-300 drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]' : isPast ? 'text-slate-300' : 'text-slate-600'}`}>
                 {step.label}
               </span>
             </div>
@@ -166,61 +173,89 @@ function App() {
     );
   };
 
-  const hasSummary = summary.length > 100 && !summary.includes("Awaiting") && !summary.includes("Deploying") && !summary.includes("Termination");
+  const hasSummary = summary.length > 100 && !summary.includes("Awaiting") && !summary.includes("DEPLOYING") && !summary.includes("TERMINATING");
 
   return (
-    <div className="min-h-screen bg-[#18181B] text-zinc-900 font-sans overflow-hidden relative cursor-none flex items-center justify-center p-4 sm:p-8">
+    <div className="min-h-screen bg-[#09090b] text-white font-sans overflow-hidden relative cursor-none flex items-center justify-center p-4 sm:p-8">
 
-      {/* ── HIGH-AFFORDANCE PRECISION GHOST CURSOR ── */}
+      {/* ── 3D NEON GHOST CURSOR ── */}
       <div 
-        className="pointer-events-none fixed top-0 left-0 w-8 h-8 rounded-full border border-zinc-500 z-[100] transition-all duration-150 ease-out flex items-center justify-center mix-blend-difference"
-        style={{ transform: `translate(${mousePos.x - 16}px, ${mousePos.y - 16}px) scale(${hovered ? 1.5 : 1})` }}
+        className="pointer-events-none fixed top-0 left-0 w-10 h-10 rounded-full border-2 border-white/40 z-[100] transition-all duration-200 ease-out flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.3)] mix-blend-screen"
+        style={{ transform: `translate(${mousePos.x - 20}px, ${mousePos.y - 20}px) scale(${hovered ? 1.4 : 1})` }}
       />
       <div 
-        className="pointer-events-none fixed top-0 left-0 w-1.5 h-1.5 bg-white rounded-full z-[100]"
-        style={{ transform: `translate(${mousePos.x - 3}px, ${mousePos.y - 3}px)` }}
+        className="pointer-events-none fixed top-0 left-0 w-2 h-2 bg-cyan-300 rounded-full z-[100] shadow-[0_0_10px_#67e8f9]"
+        style={{ transform: `translate(${mousePos.x - 4}px, ${mousePos.y - 4}px)` }}
       />
 
-      {/* ── MAIN WHITE CONTAINER (LINEAR STYLE) ── */}
-      <div className="relative z-10 w-full max-w-5xl bg-white border border-black/5 shadow-[0_8px_40px_rgba(0,0,0,0.04),0_1px_3px_rgba(0,0,0,0.02)] rounded-3xl flex flex-col overflow-hidden">
+      {/* ── CINEMATIC BLURRED BACKGROUND ── */}
+      {/* Creates the out-of-focus dark studio background effect */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 via-[#09090b] to-[#09090b] opacity-80" />
+      <div className="absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] bg-purple-600/20 blur-[120px] rounded-full mix-blend-screen animate-pulse pointer-events-none" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-blue-600/20 blur-[150px] rounded-full mix-blend-screen animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
+
+      {/* ── 3D THICK GLASS MAIN BLOCK ── */}
+      <div className="relative z-10 w-full max-w-4xl bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-purple-600/20 backdrop-blur-2xl rounded-[2.5rem] flex flex-col overflow-hidden transition-all duration-700
+        border border-white/20 
+        shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.4),inset_0_0_20px_rgba(255,255,255,0.05)]">
         
-        {/* Navigation / Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-black/5 bg-white p-6 sm:px-10">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl flex items-center justify-center shadow-inner">
-              <Bot className="w-7 h-7 text-zinc-900" />
+        {/* Edge highlight to simulate 3D thickness */}
+        <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent opacity-80" />
+        <div className="absolute left-0 inset-y-0 w-[1px] bg-gradient-to-b from-cyan-300/40 to-transparent opacity-50" />
+
+        {/* ── Header ── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 bg-white/[0.02] p-8 relative z-20">
+          <div className="flex items-center gap-5">
+            {/* 3D App Icon */}
+            <div className="p-3 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(37,99,235,0.4),inset_0_2px_4px_rgba(255,255,255,0.4)] border border-blue-400/50">
+              <Bot className="w-8 h-8 text-white drop-shadow-md" />
             </div>
             <div>
-              <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-zinc-950 to-zinc-600 flex items-center gap-3">
-                Scribe<span className="font-light text-zinc-500">_OS</span>
+              <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)]">
+                Scribe<span className="font-light text-cyan-200">_OS</span>
               </h1>
-              <p className="text-zinc-500 mt-1.5 text-xs uppercase tracking-[0.25em] font-medium flex items-center gap-2">
-                <Server className="w-3.5 h-3.5 text-zinc-600" /> IIT Base Architecture
+              <p className="text-blue-200 mt-1 text-[10px] uppercase tracking-[0.3em] font-bold flex items-center gap-2 drop-shadow-sm">
+                <Server className="w-3.5 h-3.5 text-cyan-400" /> Neural Architecture
               </p>
             </div>
           </div>
-          <div className="flex bg-zinc-50 p-1 rounded-full border border-zinc-200">
-            <button onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={() => setActiveTab('terminal')} className={`px-6 py-2 rounded-full text-xs font-semibold tracking-widest uppercase transition-all flex items-center gap-2 ${activeTab === 'terminal' ? 'bg-white text-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.05)]' : 'text-zinc-500 hover:text-zinc-700'}`}>
-              <TerminalSquare className="w-4 h-4" /> Console
-            </button>
-            <button onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={() => setActiveTab('vault')} className={`px-6 py-2 rounded-full text-xs font-semibold tracking-widest uppercase transition-all flex items-center gap-2 ${activeTab === 'vault' ? 'bg-white text-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.05)]' : 'text-zinc-500 hover:text-zinc-700'}`}>
-              <History className="w-4 h-4" /> Vault {history.length > 0 && <span className="text-[10px] ml-1.5 text-zinc-400">[{history.length}]</span>}
-            </button>
+          
+          <div className="flex items-center gap-4 mt-4 sm:mt-0">
+            <StatusBadge />
+            <div className="h-8 w-px bg-white/10 mx-1 hidden sm:block" />
+            <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10 shadow-inner">
+              <button 
+                onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                onClick={() => setActiveTab('terminal')} 
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 uppercase tracking-widest ${activeTab === 'terminal' ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.2)] border border-cyan-400/30' : 'text-slate-400 hover:text-white border border-transparent'}`}
+              >
+                <TerminalSquare className="w-4 h-4" /> Console
+              </button>
+              <button 
+                onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                onClick={() => setActiveTab('vault')} 
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 uppercase tracking-widest ${activeTab === 'vault' ? 'bg-gradient-to-r from-purple-500/20 to-fuchsia-600/20 text-fuchsia-300 shadow-[0_0_15px_rgba(217,70,239,0.2)] border border-fuchsia-400/30' : 'text-slate-400 hover:text-white border border-transparent'}`}
+              >
+                <History className="w-4 h-4" /> Vault
+                {history.length > 0 && <span className="bg-white/10 text-white px-1.5 py-0.5 rounded-md text-[9px] ml-1">{history.length}</span>}
+              </button>
+            </div>
           </div>
         </div>
 
-        {activeTab === 'terminal' ? (
-          <div className="p-6 sm:p-10 flex flex-col gap-6 bg-[#FAFAFB]">
+        {/* ── CONSOLE VIEW ── */}
+        {activeTab === 'terminal' && (
+          <div className="p-8 sm:p-10 flex flex-col gap-6 relative z-20">
             
-            {/* Input Module */}
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch relative z-20">
-              <div className="flex-1 relative group bg-white border border-black/10 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.02)] focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
+            {/* Input Row */}
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+              <div className="flex-1 relative group bg-black/30 border border-white/10 rounded-2xl shadow-inner focus-within:border-cyan-400 focus-within:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all">
                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <Mic className="h-5 w-5 text-zinc-400 group-focus-within:text-blue-500 transition-colors" />
+                  <Mic className="h-5 w-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors drop-shadow-[0_0_5px_currentColor]" />
                 </div>
                 <input
-                  className="w-full bg-transparent py-5 pl-14 pr-6 text-base text-zinc-950 placeholder-zinc-400 outline-none disabled:opacity-50 font-mono tracking-tight"
-                  placeholder="Insert secure meeting URL..."
+                  className="w-full bg-transparent py-5 pl-14 pr-6 text-base text-white placeholder-slate-500 outline-none disabled:opacity-50 font-mono tracking-wide"
+                  placeholder="Insert secure Meet URL..."
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={isRunning}
@@ -229,39 +264,47 @@ function App() {
               </div>
 
               {!isRunning ? (
-                <button onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={startBot} disabled={!url}
-                  className="bg-zinc-900 hover:bg-black text-white disabled:opacity-40 px-8 py-5 rounded-2xl font-bold text-xs uppercase tracking-[0.15em] transition-all transform hover:-translate-y-0.5 shadow-[0_4px_10px_rgba(0,0,0,0.15)] flex items-center justify-center gap-3">
-                  Deploy Intelligence <ChevronRight className="w-4 h-4" />
+                <button 
+                  onClick={startBot} disabled={!url}
+                  onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                  className="bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-black disabled:opacity-40 px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all transform hover:-translate-y-1 shadow-[0_10px_20px_rgba(37,99,235,0.4)] flex items-center justify-center gap-3 border border-cyan-200/50"
+                >
+                  Deploy <ChevronRight className="w-5 h-5" />
                 </button>
               ) : (
-                <button onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={stopBot}
-                  className="bg-red-500/10 border border-red-500/50 hover:bg-red-500/20 text-red-400 px-8 py-5 rounded-2xl font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-[0_4px_10px_rgba(244,63,94,0.1)] flex items-center justify-center gap-3">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Extract Data
+                <button 
+                  onClick={stopBot}
+                  onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                  className="bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-400 hover:to-purple-500 text-white px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all transform hover:-translate-y-1 shadow-[0_10px_20px_rgba(239,68,68,0.4)] flex items-center justify-center gap-3 border border-red-300/50"
+                >
+                  <Loader2 className="w-5 h-5 animate-spin drop-shadow-md" /> Extract
                 </button>
               )}
             </div>
 
-            {/* Loading Stepper */}
             <PipelineStepper />
 
-            {/* Output Buffer (Nested Glass Pane) */}
-            <div className="bg-white border border-black/5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col overflow-hidden">
-              <div className="bg-zinc-50 border-b border-black/5 px-6 py-4 flex justify-between items-center">
-                <h2 className="text-[10px] font-bold text-zinc-500 tracking-widest uppercase flex items-center gap-2">
-                  <TerminalSquare className="w-3.5 h-3.5" /> Intelligence Output
+            {/* Output Buffer Box */}
+            <div className="bg-black/40 border border-white/10 rounded-[2rem] shadow-inner flex flex-col overflow-hidden relative">
+              {/* Inner ambient glow */}
+              <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+              
+              <div className="border-b border-white/10 px-8 py-5 flex justify-between items-center bg-white/[0.02]">
+                <h2 className="text-[10px] font-bold text-cyan-400 tracking-[0.2em] uppercase flex items-center gap-3 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">
+                  <TerminalSquare className="w-4 h-4" /> Intelligence Output
                 </h2>
-                <div className="flex items-center gap-3">
-                  <StatusBadge />
-                  {hasSummary && (
-                    <button onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={() => downloadPDF()}
-                      className="flex items-center gap-2 hover:bg-zinc-100 text-zinc-900 border border-zinc-200 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all">
-                      <Download className="w-3.5 h-3.5" /> PDF
-                    </button>
-                  )}
-                </div>
+                {hasSummary && (
+                  <button 
+                    onClick={() => downloadPDF()} 
+                    onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                    className="flex items-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_0_10px_rgba(34,211,238,0.2)]"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export PDF
+                  </button>
+                )}
               </div>
-              <div className="p-8 min-h-[300px] max-h-[400px] overflow-y-auto custom-scrollbar">
-                <div className="text-zinc-600 leading-relaxed prose prose-zinc prose-sm sm:prose-base max-w-none prose-headings:text-zinc-950 prose-headings:font-bold prose-strong:text-zinc-950 prose-a:text-blue-600">
+              <div className="p-8 min-h-[300px] max-h-[400px] overflow-y-auto custom-scrollbar relative z-10">
+                <div className="text-slate-300 leading-loose prose prose-invert prose-sm sm:prose-base max-w-none prose-headings:text-white prose-headings:font-bold prose-strong:text-cyan-300 prose-a:text-blue-400">
                   <ReactMarkdown className="animate-fade-in">{summary}</ReactMarkdown>
                 </div>
               </div>
@@ -270,32 +313,40 @@ function App() {
           </div>
         ) : (
           /* VAULT HISTORY VIEW */
-          <div className="p-6 sm:p-10 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar bg-[#FAFAFB]">
-            <h2 className="text-lg font-semibold text-zinc-900 mb-8 flex items-center gap-2">
-              <Server className="w-5 h-5 text-zinc-400" /> Intelligence Vault
+          <div className="p-8 sm:p-10 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar relative z-20">
+            <h2 className="text-xl font-bold text-white mb-8 flex items-center gap-3 drop-shadow-md">
+              <Server className="w-6 h-6 text-fuchsia-400" /> Intelligence Vault
             </h2>
             
             {history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-zinc-400 mt-20 gap-4">
-                <History className="w-12 h-12 opacity-50" />
-                <p className="text-xs font-mono uppercase tracking-[0.1em]">Memory Banks Empty</p>
+              <div className="flex flex-col items-center justify-center text-white/30 mt-20 gap-4">
+                <History className="w-16 h-16 drop-shadow-lg" />
+                <p className="text-sm font-mono uppercase tracking-[0.2em]">Storage Array Empty</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {history.map((item, idx) => (
-                  <div key={idx} className="bg-white border border-black/5 hover:border-black/10 p-6 rounded-2xl transition-all duration-300 group flex flex-col gap-5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.04)]">
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[10px] font-mono font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded w-max tracking-widest">ID_{item.id.toString().slice(-6)}</span>
-                        <span className="text-[11px] text-zinc-400 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-zinc-600"/> {item.date}</span>
+                  <div key={idx} className="bg-black/30 border border-white/10 hover:border-fuchsia-400/50 p-6 rounded-3xl transition-all duration-300 group flex flex-col gap-4 shadow-inner hover:shadow-[0_0_25px_rgba(217,70,239,0.15)] transform hover:-translate-y-1 relative overflow-hidden">
+                    {/* Hover Glow */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/20 blur-[50px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                    
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-mono font-bold text-fuchsia-300 bg-fuchsia-500/10 border border-fuchsia-500/20 px-2.5 py-1 rounded-md w-max tracking-[0.1em] shadow-[0_0_10px_rgba(217,70,239,0.2)]">
+                          ID_{item.id.toString().slice(-6)}
+                        </span>
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/> {item.date}</span>
                       </div>
-                      <button onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={() => downloadPDF(item.text)}
-                        className="p-3 bg-white hover:bg-zinc-100 text-zinc-400 hover:text-zinc-900 border border-zinc-200 rounded-xl transition-all shadow-sm">
-                        <Download className="w-4 h-4 text-blue-600" />
+                      <button 
+                        onClick={() => downloadPDF(item.text)} 
+                        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                        className="p-3 bg-white/5 hover:bg-fuchsia-500/20 text-slate-400 hover:text-fuchsia-300 border border-white/10 hover:border-fuchsia-400/50 rounded-xl transition-all shadow-sm"
+                      >
+                        <Download className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="w-full h-px bg-zinc-100" />
-                    <p className="text-xs text-zinc-600 line-clamp-3 leading-relaxed">
+                    <div className="w-full h-px bg-white/5 relative z-10" />
+                    <p className="text-sm text-slate-300 line-clamp-3 leading-relaxed relative z-10">
                       {item.text.replace(/#/g, '').replace(/\*/g, '')}
                     </p>
                   </div>
@@ -308,12 +359,12 @@ function App() {
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; border: 1px solid rgba(0,0,0,0.2); }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,0.4); shadow: 0 0 10px rgba(34,211,238,0.5); }
       `}} />
     </div>
   );
