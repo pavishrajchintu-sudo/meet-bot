@@ -39,7 +39,7 @@ function App() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // ── CORE BACKEND FUNCTIONS (UNCHANGED) ─────────────────────────────────
+  // ── CORE BACKEND FUNCTIONS ──────────────────────────────────────────────
   const startPolling = (id) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
@@ -82,6 +82,7 @@ function App() {
     try {
       setSummary("🛑 **TERMINATING SESSION...** // Initiating extraction protocol");
       await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'stop', botId: botId }) });
+      
       setSummary("⏳ **SYNCING MEDIA PACKAGE...** // Polling server storage");
       let audioUrl = null;
       for (let i = 0; i < 20; i++) {
@@ -90,9 +91,11 @@ function App() {
         if (data.status === 'ready') { audioUrl = data.audioUrl; break; }
         await new Promise(r => setTimeout(r, 5000));
       }
+
       setSummary("🎙️ **NEURAL STT PIPELINE...** // Transcribing high-fidelity audio");
       const transRes = await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'start_transcription', audioUrl }) });
       const { transcriptId } = await transRes.json();
+      
       let transcriptText = null;
       for (let i = 0; i < 30; i++) {
         const check = await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'check_transcription', transcriptId }) });
@@ -100,9 +103,11 @@ function App() {
         if (d.status === 'completed') { transcriptText = d.transcript; break; }
         await new Promise(r => setTimeout(r, 5000));
       }
+
       setSummary("🧠 **GENERATING LLM REPORT...** // Synthesizing intelligence payload");
       const sumRes = await fetch(AWS_URL, { method: 'POST', body: JSON.stringify({ action: 'summarize', transcript: transcriptText }) });
       const sumData = await sumRes.json();
+      
       setSummary(sumData.summary);
       setHistory(prev => [{ id: Date.now(), text: sumData.summary, date: new Date().toLocaleString() }, ...prev]);
     } catch (e) { setSummary(`❌ **CRITICAL FAILURE:** ${e.message}`); }
@@ -189,7 +194,6 @@ function App() {
       />
 
       {/* ── CINEMATIC BLURRED BACKGROUND ── */}
-      {/* Creates the out-of-focus dark studio background effect */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 via-[#09090b] to-[#09090b] opacity-80" />
       <div className="absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] bg-purple-600/20 blur-[120px] rounded-full mix-blend-screen animate-pulse pointer-events-none" style={{ animationDuration: '6s' }} />
       <div className="absolute bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-blue-600/20 blur-[150px] rounded-full mix-blend-screen animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
@@ -199,14 +203,13 @@ function App() {
         border border-white/20 
         shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.4),inset_0_0_20px_rgba(255,255,255,0.05)]">
         
-        {/* Edge highlight to simulate 3D thickness */}
+        {/* Edge highlights */}
         <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent opacity-80" />
         <div className="absolute left-0 inset-y-0 w-[1px] bg-gradient-to-b from-cyan-300/40 to-transparent opacity-50" />
 
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 bg-white/[0.02] p-8 relative z-20">
           <div className="flex items-center gap-5">
-            {/* 3D App Icon */}
             <div className="p-3 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(37,99,235,0.4),inset_0_2px_4px_rgba(255,255,255,0.4)] border border-blue-400/50">
               <Bot className="w-8 h-8 text-white drop-shadow-md" />
             </div>
@@ -286,7 +289,6 @@ function App() {
 
             {/* Output Buffer Box */}
             <div className="bg-black/40 border border-white/10 rounded-[2rem] shadow-inner flex flex-col overflow-hidden relative">
-              {/* Inner ambient glow */}
               <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
               
               <div className="border-b border-white/10 px-8 py-5 flex justify-between items-center bg-white/[0.02]">
@@ -311,7 +313,7 @@ function App() {
             </div>
 
           </div>
-        ) : (
+        )  (
           /* VAULT HISTORY VIEW */
           <div className="p-8 sm:p-10 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar relative z-20">
             <h2 className="text-xl font-bold text-white mb-8 flex items-center gap-3 drop-shadow-md">
@@ -327,7 +329,6 @@ function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {history.map((item, idx) => (
                   <div key={idx} className="bg-black/30 border border-white/10 hover:border-fuchsia-400/50 p-6 rounded-3xl transition-all duration-300 group flex flex-col gap-4 shadow-inner hover:shadow-[0_0_25px_rgba(217,70,239,0.15)] transform hover:-translate-y-1 relative overflow-hidden">
-                    {/* Hover Glow */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/20 blur-[50px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                     
                     <div className="flex justify-between items-start relative z-10">
@@ -364,7 +365,7 @@ function App() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; border: 1px solid rgba(0,0,0,0.2); }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,0.4); shadow: 0 0 10px rgba(34,211,238,0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,0.4); box-shadow: 0 0 10px rgba(34,211,238,0.5); }
       `}} />
     </div>
   );
