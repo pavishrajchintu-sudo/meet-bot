@@ -2,29 +2,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { jsPDF } from "jspdf";
 import { 
-  Bot, SquareTerminal, Download, Settings, Mic, Zap, Sparkles, 
+  Bot, SquareTerminal, Download, Mic, Zap, 
   Server, ChevronRight, History, TerminalSquare, Loader2, CheckCircle2, Clock 
 } from 'lucide-react';
 
 function App() {
+  // ── STATE & LOGIC (UNCHANGED) ──────────────────────────────────────────
   const [url, setUrl] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [summary, setSummary] = useState('Awaiting connection sequence...\n\nYour neural meeting insights will render here.');
   const [botId, setBotId] = useState(null);
   const [botStatus, setBotStatus] = useState('idle');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState('terminal'); // 'terminal' or 'vault'
+  const [hovered, setHovered] = useState(false); // For cursor expansion
+  const [activeTab, setActiveTab] = useState('terminal');
   
-  // History State (Persisted to LocalStorage)
   const [history, setHistory] = useState(() => {
     const saved = localStorage.getItem('scribe_history');
     return saved ? JSON.parse(saved) : [];
   });
 
   const pollRef = useRef(null);
-  
-  // ⚠️ DO NOT CHANGE: Your precise AWS Endpoint
   const AWS_URL = "https://ofunwseaxkbz3koxygqfg3ve6y0skfxi.lambda-url.ap-south-1.on.aws/";
 
   useEffect(() => {
@@ -33,7 +31,6 @@ function App() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Save history on change
   useEffect(() => {
     localStorage.setItem('scribe_history', JSON.stringify(history));
   }, [history]);
@@ -42,7 +39,7 @@ function App() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // ── CORE LOGIC (UNCHANGED) ──────────────────────────────────────────────
+  // ── CORE BACKEND FUNCTIONS (UNCHANGED) ─────────────────────────────────
   const startPolling = (id) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
@@ -176,7 +173,6 @@ function App() {
       const finalOutput = sumData.summary || "❌ Summary generation failed.";
       setSummary(finalOutput);
 
-      // HISTORY RECORDING LOGIC
       if (sumData.summary) {
         setHistory(prev => [{
           id: Date.now(),
@@ -195,7 +191,6 @@ function App() {
     setBotStatus('idle');
   };
 
-  // Upgraded to accept specific text for History downloads
   const downloadPDF = (textToDownload = summary) => {
     const doc = new jsPDF();
     doc.setFont("helvetica", "bold");
@@ -220,58 +215,56 @@ function App() {
     doc.save(`ScribeAI_${Date.now()}.pdf`);
   };
 
-  // ── UI HELPERS ──────────────────────────────────────────────────────────
+  // ── NEW UI UX COMPONENTS ────────────────────────────────────────────────
 
   const StatusBadge = () => {
     const configs = {
-      idle:      { color: 'text-slate-500', bg: 'bg-white/5', border: 'border-white/10', label: 'SYSTEM STANDBY' },
-      joining:   { color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-500/30', label: 'CONNECTING...' },
-      waiting:   { color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-500/30', label: 'AWAITING ENTRY' },
-      in_call:   { color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-500/30', label: 'UPLINK ACTIVE' },
-      done:      { color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-500/30', label: 'MEETING CONCLUDED' },
+      idle:      { text: 'text-white/60', bg: 'bg-white/[0.05]', border: 'border-white/[0.05]', label: 'SYSTEM STANDBY' },
+      joining:   { text: 'text-orange-300', bg: 'bg-orange-500/[0.15]', border: 'border-orange-500/30', label: 'CONNECTING...' },
+      waiting:   { text: 'text-orange-300', bg: 'bg-orange-500/[0.15]', border: 'border-orange-500/30', label: 'AWAITING ENTRY' },
+      in_call:   { text: 'text-teal-300', bg: 'bg-teal-500/[0.15]', border: 'border-teal-500/30', label: 'UPLINK ACTIVE' },
+      done:      { text: 'text-indigo-300', bg: 'bg-indigo-500/[0.15]', border: 'border-indigo-500/30', label: 'MEETING CONCLUDED' },
     };
     const c = configs[botStatus] || configs.idle;
     return (
-      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${c.bg} border ${c.border} shadow-sm backdrop-blur-sm transition-all`}>
-        <div className={`w-2 h-2 rounded-full ${c.color.replace('text-', 'bg-')} ${botStatus !== 'idle' ? 'animate-pulse' : ''}`} />
-        <span className={`text-[10px] tracking-widest font-bold font-mono ${c.color}`}>{c.label}</span>
+      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${c.bg} border ${c.border} backdrop-blur-md transition-all shadow-[0_4px_12px_rgba(0,0,0,0.1)]`}>
+        <div className={`w-1.5 h-1.5 rounded-full ${c.text.replace('text-', 'bg-')} ${botStatus !== 'idle' ? 'animate-pulse' : ''}`} />
+        <span className={`text-[10px] tracking-widest font-bold font-mono ${c.text}`}>{c.label}</span>
       </div>
     );
   };
 
-  // Dynamic Stepper UI based on summary text parsing
   const PipelineStepper = () => {
     const steps = [
-      { key: "Stopping", label: "Extracting Bot" },
-      { key: "Audio", label: "Fetching Media" },
+      { key: "Stopping", label: "Extract" },
+      { key: "Audio", label: "Fetch" },
       { key: "Transcribing", label: "Neural STT" },
-      { key: "Generating", label: "LLM Synthesis" }
+      { key: "Generating", label: "Synthesis" }
     ];
 
     let activeIndex = -1;
     steps.forEach((s, idx) => { if (summary.includes(s.key)) activeIndex = idx; });
     
-    // Hide if we are not processing
     if (activeIndex === -1 && !summary.includes("Starting")) return null;
     if (summary.includes("❌") || (summary.length > 200 && !summary.includes("Generating"))) return null;
 
     return (
-      <div className="flex items-center justify-between w-full mb-6 bg-white/[0.02] border border-white/5 p-4 rounded-xl">
+      <div className="flex items-center justify-between w-full mb-6 bg-white/[0.03] backdrop-blur-lg border border-white/[0.08] p-5 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
         {steps.map((step, idx) => {
           const isActive = idx === activeIndex;
           const isPast = idx < activeIndex;
           return (
-            <div key={step.key} className="flex flex-col items-center gap-2 flex-1 relative">
+            <div key={step.key} className="flex flex-col items-center gap-3 flex-1 relative z-10">
               {idx !== steps.length - 1 && (
-                <div className={`absolute top-3 left-1/2 w-full h-[2px] ${isPast ? 'bg-cyan-500/50' : 'bg-white/10'}`} />
+                <div className={`absolute top-4 left-1/2 w-full h-[1px] ${isPast ? 'bg-gradient-to-r from-cyan-400/50 to-transparent' : 'bg-white/5'}`} />
               )}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center z-10 border ${
-                isActive ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400 animate-pulse' : 
-                isPast ? 'bg-cyan-500 border-cyan-400 text-black' : 'bg-[#111] border-white/20 text-slate-500'
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border shadow-lg transition-all ${
+                isActive ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300 scale-110 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 
+                isPast ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-500' : 'bg-white/[0.02] border-white/10 text-white/20'
               }`}>
-                {isPast ? <CheckCircle2 className="w-4 h-4" /> : isActive ? <Loader2 className="w-3 h-3 animate-spin" /> : <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />}
+                {isPast ? <CheckCircle2 className="w-4 h-4" /> : isActive ? <Loader2 className="w-4 h-4 animate-spin" /> : <div className="w-1 h-1 rounded-full bg-white/20" />}
               </div>
-              <span className={`text-[10px] uppercase tracking-widest font-mono font-semibold ${isActive ? 'text-cyan-400' : isPast ? 'text-slate-300' : 'text-slate-600'}`}>
+              <span className={`text-[9px] uppercase tracking-[0.2em] font-mono font-bold ${isActive ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : isPast ? 'text-cyan-500/70' : 'text-white/30'}`}>
                 {step.label}
               </span>
             </div>
@@ -284,75 +277,99 @@ function App() {
   const hasSummary = summary.length > 100 && !summary.includes("Awaiting") && !summary.includes("Processing") && !summary.includes("Transcribing");
 
   return (
-    <div className="min-h-screen bg-[#050505] text-slate-200 font-sans overflow-hidden relative cursor-none flex items-center justify-center p-4 sm:p-8">
+    <div className="min-h-screen bg-[#02040A] text-slate-100 font-sans overflow-hidden relative cursor-none flex items-center justify-center p-4 sm:p-8">
 
-      {/* Cyberpunk Cursor */}
-      <div
-        className="pointer-events-none fixed top-0 left-0 w-6 h-6 rounded-full border border-cyan-500/50 z-[100] transition-transform duration-75 ease-out flex items-center justify-center mix-blend-screen"
-        style={{ transform: `translate(${mousePos.x - 12}px, ${mousePos.y - 12}px)` }}
-      >
-        <div className="w-1 h-1 bg-white rounded-full" />
-      </div>
+      {/* ── NEW VISCOM CURSOR ── */}
+      <div 
+        className="pointer-events-none fixed top-0 left-0 w-8 h-8 rounded-full border border-white/30 z-[100] transition-all duration-300 ease-out flex items-center justify-center mix-blend-difference"
+        style={{ transform: `translate(${mousePos.x - 16}px, ${mousePos.y - 16}px) scale(${hovered ? 1.5 : 1})` }}
+      />
+      <div 
+        className="pointer-events-none fixed top-0 left-0 w-1.5 h-1.5 bg-white rounded-full z-[100] transition-transform duration-75 ease-out mix-blend-difference"
+        style={{ transform: `translate(${mousePos.x - 3}px, ${mousePos.y - 3}px)` }}
+      />
 
-      {/* Ambient Premium Glows */}
-      <div className="absolute top-[-20%] left-[20%] w-[40vw] h-[40vw] bg-cyan-900/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[10%] w-[30vw] h-[30vw] bg-violet-900/20 blur-[120px] rounded-full pointer-events-none" />
+      {/* ── TRUE GLASSMORPHISM BACKGROUND ORBS ── */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/30 rounded-full mix-blend-screen filter blur-[100px] opacity-60 animate-pulse pointer-events-none" style={{ animationDuration: '8s' }} />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] opacity-60 pointer-events-none" />
+      <div className="absolute top-[40%] left-[40%] w-[30vw] h-[30vw] bg-fuchsia-600/10 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none" />
 
-      {/* Main Container */}
-      <div className="relative z-10 w-full max-w-5xl bg-[#0A0A0A] border border-white/10 rounded-[1.5rem] shadow-2xl flex flex-col overflow-hidden">
+      {/* ── MAIN FROSTED GLASS CONTAINER ── */}
+      <div className="relative z-10 w-full max-w-5xl bg-white/[0.02] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] rounded-[2rem] flex flex-col overflow-hidden">
         
-        {/* Header & Navigation */}
-        <div className="flex flex-col sm:flex-row items-center justify-between border-b border-white/10 bg-white/[0.02] p-6">
+        {/* Header Overlay */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+        {/* Navigation / Header */}
+        <div className="flex flex-col sm:flex-row items-center justify-between border-b border-white/[0.05] bg-white/[0.01] p-6 sm:px-10">
           <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 rounded-xl border border-white/10">
-              <Bot className="w-6 h-6 text-cyan-400" />
+            <div className="p-3 bg-white/[0.03] border border-white/[0.08] rounded-2xl shadow-inner flex items-center justify-center backdrop-blur-md">
+              <Bot className="w-6 h-6 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-white">SCRIBE_OS</h1>
-              <p className="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-semibold">IIT Standards Architecture</p>
+              <h1 className="text-xl font-bold tracking-tight text-white/90">Scribe<span className="font-light text-white/50">_OS</span></h1>
+              <p className="text-white/40 text-[9px] uppercase tracking-[0.25em] font-medium mt-0.5">Neural Architecture</p>
             </div>
           </div>
           
           <div className="flex items-center gap-4 mt-4 sm:mt-0">
             <StatusBadge />
             <div className="h-6 w-px bg-white/10 mx-2 hidden sm:block" />
-            <button onClick={() => setActiveTab('terminal')} className={`p-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'terminal' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-              <TerminalSquare className="w-4 h-4" /> Console
-            </button>
-            <button onClick={() => setActiveTab('vault')} className={`p-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'vault' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-              <History className="w-4 h-4" /> Vault <span className="bg-white/10 px-1.5 rounded text-[10px]">{history.length}</span>
-            </button>
+            <div className="flex bg-white/[0.03] border border-white/[0.05] p-1 rounded-xl backdrop-blur-md">
+              <button 
+                onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                onClick={() => setActiveTab('terminal')} 
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${activeTab === 'terminal' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70'}`}
+              >
+                <TerminalSquare className="w-4 h-4" /> Console
+              </button>
+              <button 
+                onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                onClick={() => setActiveTab('vault')} 
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${activeTab === 'vault' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/70'}`}
+              >
+                <History className="w-4 h-4" /> Vault
+                {history.length > 0 && <span className="bg-white/10 px-1.5 py-0.5 rounded text-[9px] ml-1">{history.length}</span>}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* ── CONSOLE VIEW ── */}
         {activeTab === 'terminal' && (
-          <div className="p-8 flex flex-col gap-8">
+          <div className="p-6 sm:p-10 flex flex-col gap-8">
             
             {/* Input Row */}
-            <div className="flex flex-col sm:flex-row gap-4 items-stretch">
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch relative z-20">
               <div className="flex-1 relative group">
                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                  <Mic className="h-5 w-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
+                  <Mic className="h-5 w-5 text-white/30 group-focus-within:text-cyan-300 transition-colors" />
                 </div>
                 <input
-                  className="w-full bg-[#111] border border-white/10 focus:border-cyan-500/50 rounded-xl py-4 pl-14 pr-6 text-sm text-slate-200 placeholder-slate-600 outline-none transition-all shadow-inner disabled:opacity-50 font-mono"
-                  placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                  className="w-full bg-black/20 backdrop-blur-md border border-white/10 focus:border-cyan-400/50 rounded-2xl py-4 pl-14 pr-6 text-sm text-white placeholder-white/30 outline-none transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] disabled:opacity-50 font-mono focus:ring-4 focus:ring-cyan-500/10"
+                  placeholder="Paste secure Meet URL here..."
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={isRunning}
+                  onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
                 />
               </div>
 
               {!isRunning ? (
-                <button onClick={startBot} disabled={!url}
-                  className="bg-white text-black hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-white px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)] flex items-center justify-center gap-3">
-                  Deploy Intelligence <ChevronRight className="w-4 h-4" />
+                <button 
+                  onClick={startBot} disabled={!url}
+                  onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-white disabled:opacity-40 px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-[0.15em] transition-all backdrop-blur-md flex items-center justify-center gap-3 shadow-[0_4px_14px_0_rgba(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.1)] hover:-translate-y-0.5"
+                >
+                  Initialize Uplink <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
-                <button onClick={stopBot}
-                  className="bg-red-500/10 border border-red-500/50 hover:bg-red-500/20 text-red-400 px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3">
-                  Terminate & Extract <SquareTerminal className="w-4 h-4" />
+                <button 
+                  onClick={stopBot}
+                  onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                  className="bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 hover:border-rose-500/50 text-rose-300 px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-[0.15em] transition-all backdrop-blur-md flex items-center justify-center gap-3 shadow-[0_4px_14px_0_rgba(225,29,72,0.1)] hover:-translate-y-0.5"
+                >
+                  Extract Data <SquareTerminal className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -360,21 +377,25 @@ function App() {
             {/* Loading Stepper */}
             <PipelineStepper />
 
-            {/* Output Buffer */}
+            {/* Output Buffer (Nested Glass Pane) */}
             <div className="relative group">
-              <div className="bg-[#0C0C0C] border border-white/10 rounded-2xl shadow-inner flex flex-col overflow-hidden">
-                <div className="bg-white/5 border-b border-white/5 px-6 py-3 flex justify-between items-center">
-                  <h2 className="text-[10px] font-mono text-slate-400 tracking-widest uppercase flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" /> Output Buffer
+              <div className="bg-black/30 backdrop-blur-xl border border-white/[0.05] rounded-3xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)] flex flex-col overflow-hidden">
+                <div className="bg-white/[0.02] border-b border-white/[0.05] px-6 py-4 flex justify-between items-center">
+                  <h2 className="text-[10px] font-mono text-white/40 tracking-widest uppercase flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-cyan-400/50 animate-pulse border border-cyan-200" /> Neural Output
                   </h2>
                   {hasSummary && (
-                    <button onClick={() => downloadPDF()} className="flex items-center gap-2 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all border border-transparent hover:border-white/10">
-                      <Download className="w-3 h-3" /> Export PDF
+                    <button 
+                      onClick={() => downloadPDF()} 
+                      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                      className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/80 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border border-white/10 hover:border-white/20"
+                    >
+                      <Download className="w-3 h-3" /> Export Report
                     </button>
                   )}
                 </div>
-                <div className="p-8 min-h-[350px] max-h-[450px] overflow-y-auto custom-scrollbar">
-                  <div className="text-slate-300 leading-relaxed prose prose-invert prose-p:text-slate-400 prose-headings:text-slate-100 prose-strong:text-cyan-300 prose-li:text-slate-400 max-w-none prose-headings:font-semibold prose-h2:border-b prose-h2:border-white/10 prose-h2:pb-2 text-sm">
+                <div className="p-8 min-h-[300px] max-h-[400px] overflow-y-auto custom-scrollbar">
+                  <div className="text-white/70 leading-loose prose prose-invert prose-p:text-white/60 prose-headings:text-white/90 prose-strong:text-cyan-300 prose-li:text-white/60 max-w-none prose-headings:font-medium prose-h2:border-b prose-h2:border-white/5 prose-h2:pb-3 text-sm">
                     <ReactMarkdown className="animate-fade-in">{summary}</ReactMarkdown>
                   </div>
                 </div>
@@ -386,30 +407,41 @@ function App() {
 
         {/* ── VAULT / HISTORY VIEW ── */}
         {activeTab === 'vault' && (
-          <div className="p-8 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar bg-[#0A0A0A]">
-            <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-              <Server className="w-5 h-5 text-cyan-400" /> Intelligence Vault
+          <div className="p-6 sm:p-10 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar">
+            <h2 className="text-lg font-light text-white mb-8 flex items-center gap-3">
+              <Server className="w-5 h-5 text-white/50" /> Intelligence Vault
             </h2>
             
             {history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-slate-600 mt-20 gap-4">
-                <History className="w-12 h-12 opacity-20" />
-                <p className="text-sm font-mono uppercase tracking-widest">Vault is empty</p>
+              <div className="flex flex-col items-center justify-center text-white/20 mt-20 gap-4">
+                <History className="w-12 h-12" />
+                <p className="text-xs font-mono uppercase tracking-[0.2em]">Storage Array Empty</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {history.map((item, idx) => (
-                  <div key={idx} className="bg-[#111] border border-white/5 hover:border-cyan-500/30 p-5 rounded-2xl transition-all group flex flex-col gap-4">
+                  <div key={idx} className="bg-white/[0.02] backdrop-blur-md border border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10 p-6 rounded-3xl transition-all duration-300 group flex flex-col gap-5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:shadow-[0_8px_32px_rgba(255,255,255,0.05)] hover:-translate-y-1">
                     <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded w-max">ID: {item.id.toString().slice(-6)}</span>
-                        <span className="text-xs text-slate-500 flex items-center gap-1.5"><Clock className="w-3 h-3"/> {item.date}</span>
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[9px] font-mono text-cyan-300 bg-cyan-400/10 border border-cyan-400/20 px-2 py-1 rounded w-max tracking-widest">
+                          ID_{item.id.toString().slice(-6)}
+                        </span>
+                        <span className="text-[11px] text-white/40 flex items-center gap-1.5 tracking-wide">
+                          <Clock className="w-3 h-3"/> {item.date}
+                        </span>
                       </div>
-                      <button onClick={() => downloadPDF(item.text)} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                      <button 
+                        onClick={() => downloadPDF(item.text)} 
+                        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                        className="p-3 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/5 hover:border-white/20 rounded-xl transition-all"
+                      >
                         <Download className="w-4 h-4" />
                       </button>
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed">{item.text.replace(/#/g, '').replace(/\*/g, '')}</p>
+                    <div className="w-full h-px bg-white/[0.03]" />
+                    <p className="text-xs text-white/50 line-clamp-3 leading-relaxed font-light">
+                      {item.text.replace(/#/g, '').replace(/\*/g, '')}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -420,12 +452,12 @@ function App() {
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,0.4); }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
       `}} />
     </div>
   );
