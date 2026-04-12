@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { jsPDF } from "jspdf";
+import { useAuth } from "react-oidc-context";
 import { 
   Bot, SquareTerminal, Download, Settings, Mic, Zap, Sparkles, 
-  Server, ChevronRight, History, TerminalSquare, Loader2, CheckCircle2, Clock 
+  Server, ChevronRight, History, TerminalSquare, Loader2, CheckCircle2, Clock,
+  LogIn, LogOut 
 } from 'lucide-react';
 
 function App() {
+  const auth = useAuth();
+
   const [url, setUrl] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [summary, setSummary] = useState('Awaiting connection sequence...\n\nYour neural meeting insights will render here.');
   const [botId, setBotId] = useState(null);
   const [botStatus, setBotStatus] = useState('idle');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState('terminal'); // 'terminal' or 'vault'
+  const [activeTab, setActiveTab] = useState('terminal'); 
   
-  // History State (Persisted to LocalStorage)
+  // History State
   const [history, setHistory] = useState(() => {
     const saved = localStorage.getItem('scribe_history');
     return saved ? JSON.parse(saved) : [];
@@ -24,8 +27,16 @@ function App() {
 
   const pollRef = useRef(null);
   
-  // ⚠️ DO NOT CHANGE: Your precise AWS Endpoint
-  const AWS_URL = "https://ofunwseaxkbz3koxygqfg3ve6y0skfxi.lambda-url.ap-south-1.on.aws/";
+  const AWS_URL = "https://3qvwk9es55.execute-api.ap-south-1.amazonaws.com/";
+
+  // --- NEW: Auth Header Helper ---
+  // This automatically grabs the Cognito token to unlock your API Gateway
+  const getAuthHeaders = () => {
+    return {
+      'Content-Type': 'application/json',
+      ...(auth.user?.access_token ? { 'Authorization': `Bearer ${auth.user.access_token}` } : {})
+    };
+  };
 
   useEffect(() => {
     const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
@@ -33,7 +44,6 @@ function App() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Save history on change
   useEffect(() => {
     localStorage.setItem('scribe_history', JSON.stringify(history));
   }, [history]);
@@ -42,14 +52,14 @@ function App() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // ── CORE LOGIC (UNCHANGED) ──────────────────────────────────────────────
+  // ── CORE LOGIC ──────────────────────────────────────────────
   const startPolling = (id) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(AWS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(), // <-- Added Token
           body: JSON.stringify({ action: 'status', botId: id }),
         });
         const data = await res.json();
@@ -83,7 +93,7 @@ function App() {
     try {
       const response = await fetch(AWS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(), // <-- Added Token
         body: JSON.stringify({ action: 'join', meetUrl: url }),
       });
       const data = await response.json();
@@ -111,7 +121,7 @@ function App() {
       setSummary("🛑 **Stopping bot...**\n\nInstructing Scribe AI to leave the meeting.");
       await fetch(AWS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(), // <-- Added Token
         body: JSON.stringify({ action: 'stop', botId: botId }),
       });
 
@@ -120,7 +130,7 @@ function App() {
       for (let i = 0; i < 20; i++) { 
         const res = await fetch(AWS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(), // <-- Added Token
           body: JSON.stringify({ action: 'get_audio', botId: botId }),
         });
         const data = await res.json();
@@ -136,7 +146,7 @@ function App() {
       setSummary("🎙️ **Starting Transcription...**\n\nSending high-fidelity audio to AssemblyAI.");
       const transRes = await fetch(AWS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(), // <-- Added Token
         body: JSON.stringify({ action: 'start_transcription', audioUrl }),
       });
       const transData = await transRes.json();
@@ -149,7 +159,7 @@ function App() {
       for (let i = 0; i < 30; i++) { 
         const checkRes = await fetch(AWS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(), // <-- Added Token
           body: JSON.stringify({ action: 'check_transcription', transcriptId }),
         });
         const checkData = await checkRes.json();
@@ -168,7 +178,7 @@ function App() {
       setSummary("🧠 **Generating Intelligence Report...**\n\nPassing extracted transcript to LLM engine.");
       const sumRes = await fetch(AWS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(), // <-- Added Token
         body: JSON.stringify({ action: 'summarize', transcript: transcriptText }),
       });
       const sumData = await sumRes.json();
@@ -195,7 +205,6 @@ function App() {
     setBotStatus('idle');
   };
 
-  // Upgraded to accept specific text for History downloads
   const downloadPDF = (textToDownload = summary) => {
     const doc = new jsPDF();
     doc.setFont("helvetica", "bold");
@@ -220,7 +229,8 @@ function App() {
     doc.save(`ScribeAI_${Date.now()}.pdf`);
   };
 
-  // ── UI HELPERS ──────────────────────────────────────────────────────────
+  const handleLogin = () => auth.signinRedirect();
+  const handleLogout = () => auth.removeUser();
 
   const StatusBadge = () => {
     const configs = {
@@ -239,7 +249,6 @@ function App() {
     );
   };
 
-  // Dynamic Stepper UI based on summary text parsing
   const PipelineStepper = () => {
     const steps = [
       { key: "Stopping", label: "Extracting Bot" },
@@ -251,7 +260,6 @@ function App() {
     let activeIndex = -1;
     steps.forEach((s, idx) => { if (summary.includes(s.key)) activeIndex = idx; });
     
-    // Hide if we are not processing
     if (activeIndex === -1 && !summary.includes("Starting")) return null;
     if (summary.includes("❌") || (summary.length > 200 && !summary.includes("Generating"))) return null;
 
@@ -283,10 +291,33 @@ function App() {
 
   const hasSummary = summary.length > 100 && !summary.includes("Awaiting") && !summary.includes("Processing") && !summary.includes("Transcribing");
 
+  if (!auth.isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-slate-200 font-sans overflow-hidden relative cursor-none flex items-center justify-center p-4">
+        <div className="pointer-events-none fixed top-0 left-0 w-6 h-6 rounded-full border border-cyan-500/50 z-[100] transition-transform duration-75 ease-out flex items-center justify-center mix-blend-screen" style={{ transform: `translate(${mousePos.x - 12}px, ${mousePos.y - 12}px)` }}>
+          <div className="w-1 h-1 bg-white rounded-full" />
+        </div>
+        <div className="absolute top-[-20%] left-[20%] w-[40vw] h-[40vw] bg-cyan-900/20 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-20%] right-[10%] w-[30vw] h-[30vw] bg-violet-900/20 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-sm bg-[#0A0A0A] border border-white/10 rounded-[1.5rem] shadow-2xl flex flex-col items-center justify-center p-10 text-center">
+          <div className="p-4 mb-6 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 rounded-2xl border border-white/10 shadow-inner">
+            <Bot className="w-10 h-10 text-cyan-400" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-white mb-2">SCRIBE_OS</h1>
+          <p className="text-slate-500 text-xs uppercase tracking-[0.2em] font-semibold mb-10">Restricted Access</p>
+          
+          <button onClick={handleLogin} className="w-full bg-white text-black hover:bg-slate-200 px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)] flex items-center justify-center gap-3">
+            Authenticate <LogIn className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050505] text-slate-200 font-sans overflow-hidden relative cursor-none flex items-center justify-center p-4 sm:p-8">
 
-      {/* Cyberpunk Cursor */}
       <div
         className="pointer-events-none fixed top-0 left-0 w-6 h-6 rounded-full border border-cyan-500/50 z-[100] transition-transform duration-75 ease-out flex items-center justify-center mix-blend-screen"
         style={{ transform: `translate(${mousePos.x - 12}px, ${mousePos.y - 12}px)` }}
@@ -294,14 +325,11 @@ function App() {
         <div className="w-1 h-1 bg-white rounded-full" />
       </div>
 
-      {/* Ambient Premium Glows */}
       <div className="absolute top-[-20%] left-[20%] w-[40vw] h-[40vw] bg-cyan-900/20 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[10%] w-[30vw] h-[30vw] bg-violet-900/20 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Main Container */}
       <div className="relative z-10 w-full max-w-5xl bg-[#0A0A0A] border border-white/10 rounded-[1.5rem] shadow-2xl flex flex-col overflow-hidden">
         
-        {/* Header & Navigation */}
         <div className="flex flex-col sm:flex-row items-center justify-between border-b border-white/10 bg-white/[0.02] p-6">
           <div className="flex items-center gap-4">
             <div className="p-2.5 bg-gradient-to-br from-cyan-500/10 to-violet-500/10 rounded-xl border border-white/10">
@@ -322,14 +350,16 @@ function App() {
             <button onClick={() => setActiveTab('vault')} className={`p-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'vault' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
               <History className="w-4 h-4" /> Vault <span className="bg-white/10 px-1.5 rounded text-[10px]">{history.length}</span>
             </button>
+            
+            <button onClick={handleLogout} className="ml-2 p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20 hover:border-red-500/50" title="Sign Out">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* ── CONSOLE VIEW ── */}
         {activeTab === 'terminal' && (
           <div className="p-8 flex flex-col gap-8">
             
-            {/* Input Row */}
             <div className="flex flex-col sm:flex-row gap-4 items-stretch">
               <div className="flex-1 relative group">
                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -357,10 +387,8 @@ function App() {
               )}
             </div>
 
-            {/* Loading Stepper */}
             <PipelineStepper />
 
-            {/* Output Buffer */}
             <div className="relative group">
               <div className="bg-[#0C0C0C] border border-white/10 rounded-2xl shadow-inner flex flex-col overflow-hidden">
                 <div className="bg-white/5 border-b border-white/5 px-6 py-3 flex justify-between items-center">
@@ -384,7 +412,6 @@ function App() {
           </div>
         )}
 
-        {/* ── VAULT / HISTORY VIEW ── */}
         {activeTab === 'vault' && (
           <div className="p-8 min-h-[500px] max-h-[600px] overflow-y-auto custom-scrollbar bg-[#0A0A0A]">
             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
