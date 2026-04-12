@@ -34,7 +34,7 @@ function App() {
   const getAuthHeaders = () => {
     return {
       'Content-Type': 'application/json',
-      ...(auth.user?.access_token ? { 'Authorization': `Bearer ${auth.user.access_token}` } : {})
+      ...(auth.user?.id_token ? { 'Authorization': `Bearer ${auth.user.access_token}` } : {})
     };
   };
 
