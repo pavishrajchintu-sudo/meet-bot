@@ -3,6 +3,8 @@ node_modules/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Puppeteer Chrome Profile Cache (Massive file size)
 server/bot-session/
